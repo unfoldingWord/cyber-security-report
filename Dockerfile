@@ -33,7 +33,6 @@ COPY --from=builder /build/venv /app/venv
 COPY src/ src/
 COPY templates/ templates/
 COPY main.py .
-COPY config.yaml .
 
 # Set environment variables
 ENV PATH="/app/venv/bin:$PATH" \
