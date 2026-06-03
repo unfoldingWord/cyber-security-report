@@ -1,0 +1,6 @@
+.env
+reports
+development
+.venv
+.idea
+config.yaml

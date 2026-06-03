@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ config.report_title }} — {{ now.strftime("%Y-%m-%d") }}</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #231F20;
+      background: #f5f7f9;
+      padding: 2rem 1rem;
+    }
+
+    .wrapper {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: #014263;
+      color: #fff;
+      padding: 1.5rem 2rem;
+      border-radius: 6px 6px 0 0;
+    }
+
+    header h1 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: #31ADE3;
+      text-transform: uppercase;
+    }
+
+    header .date {
+      font-size: 0.85rem;
+      color: #70C9CC;
+      margin-top: 0.2rem;
+    }
+
+    .section {
+      background: #fff;
+      padding: 1.5rem 2rem;
+      border-left: 4px solid transparent;
+    }
+
+    .section + .section {
+      border-top: 1px solid #e8eaed;
+    }
+
+    .section.core {
+      border-left-color: #31ADE3;
+    }
+
+    .section.items {
+      border-left-color: #014263;
+    }
+
+    .section.attention {
+      border-left-color: #E59D33;
+      border-radius: 0 0 6px 6px;
+    }
+
+    h2 {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #014263;
+      margin-bottom: 0.9rem;
+    }
+
+    .core ul, .attention ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .core ul li, .attention ul li {
+      padding: 0.4rem 0 0.4rem 1.2rem;
+      position: relative;
+      color: #231F20;
+    }
+
+    .core ul li::before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: #31ADE3;
+      font-size: 0.8rem;
+      top: 0.5rem;
+    }
+
+    .attention ul li::before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: #E59D33;
+      font-size: 0.8rem;
+      top: 0.5rem;
+    }
+
+    .item {
+      padding: 1.2rem 0;
+      border-top: 1px solid #f0f2f4;
+    }
+
+    .item:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .item-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #014263;
+      margin-bottom: 0.5rem;
+    }
+
+    .item-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.5rem;
+      border-radius: 3px;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+
+    .badge-critical {
+      background: #fde8e8;
+      color: #c0392b;
+    }
+
+    .badge-high {
+      background: #fef3e0;
+      color: #b7510e;
+    }
+
+    .badge-medium {
+      background: #e8f4fd;
+      color: #014263;
+    }
+
+    .badge-threat {
+      background: #edf7f7;
+      color: #1a7a7d;
+    }
+
+    .item-row {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: 0.2rem 0.8rem;
+      margin: 0.3rem 0;
+      font-size: 0.88rem;
+    }
+
+    .item-label {
+      font-weight: 600;
+      color: #6b7280;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding-top: 0.05rem;
+    }
+
+    .item-text {
+      color: #231F20;
+    }
+
+    a {
+      color: #31ADE3;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: #9ca3af;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <h1>{{ config.report_title }}</h1>
+    <div class="date">{{ now.strftime("%B %-d, %Y") }} &nbsp;|&nbsp; Sources: {{ report.sources | join(", ") }}</div>
+  </header>
+
+  <!-- Core Situation -->
+  <div class="section core">
+    <h2>Core Situation</h2>
+    <ul>
+{% for item in report.core_situation %}
+      <li>{{ item }}</li>
+{% endfor %}
+    </ul>
+  </div>
+
+  <!-- Key Items -->
+  <div class="section items">
+    <h2>Key Items</h2>
+
+{% for item in report.key_items %}
+    <div class="item">
+      <div class="item-title">
+        <span class="item-badge badge-{{ item.severity }}">{{ item.severity }}</span>
+        {{ item.title }}
+      </div>
+      <div class="item-row">
+        <span class="item-label">Why relevant</span>
+        <span class="item-text">{{ item.why_relevant }}</span>
+      </div>
+      <div class="item-row">
+        <span class="item-label">Action</span>
+        <span class="item-text">{{ item.action }}</span>
+      </div>
+{% if item.links %}
+      <div class="item-row">
+        <span class="item-label">Links</span>
+        <span class="item-text">
+{% for link in item.links %}
+          <a href="{{ link }}">{{ link }}</a>{% if not loop.last %} &nbsp;|&nbsp;{% endif %}
+{% endfor %}
+        </span>
+      </div>
+{% endif %}
+{% if item.cve %}
+      <div class="item-row">
+        <span class="item-label">CVE</span>
+        <span class="item-text">{{ item.cve }}</span>
+      </div>
+{% endif %}
+    </div>
+{% endfor %}
+
+  </div>
+
+  <!-- Extra Attention -->
+  <div class="section attention">
+    <h2>What Requires Extra Attention Today</h2>
+    <ul>
+{% for item in report.extra_attention %}
+      <li>{{ item }}</li>
+{% endfor %}
+    </ul>
+  </div>
+
+</div>
+<footer>Generated {{ now.strftime("%B %-d, %Y") }} from open-source security feeds.</footer>
+</body>
+</html>

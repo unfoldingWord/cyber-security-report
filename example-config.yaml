@@ -1,0 +1,39 @@
+feeds:
+  news:
+    - url: https://hnrss.org/frontpage
+      name: Hacker News
+      max_items: 20
+    - url: https://www.bleepingcomputer.com/feed/
+      name: BleepingComputer
+      max_items: 20
+    - url: https://www.theregister.com/security/headlines.atom
+      name: The Register
+      max_items: 20
+
+report:
+  title: "Cybersecurity Standup Intelligence Report"
+  lookback_hours: 24
+  max_items_to_llm: 30
+
+filters:
+  ignore:
+    - "Microsoft Windows"
+    - Azure
+    - Cisco
+    - Fortinet
+    - VMWare
+  include:
+    - AWS
+    - Linux
+    - VSCode
+
+output:
+  format: "markdown"
+  file:
+    enabled: true
+    html_path: "reports/standup_{date}.html"
+    markdown_path: "reports/standup_{date}.md"
+  zulip:
+    enabled: true
+    stream: "Security"
+    topic: "Daily Standup"

@@ -1,0 +1,40 @@
+# {{ config.report_title }} — {{ now.strftime("%B %-d, %Y") }}
+
+**Sources:** {{ report.sources | join(", ") }}
+
+---
+
+## Core Situation
+
+{% for item in report.core_situation %}
+- {{ item }}
+{% endfor %}
+
+---
+
+## Key Items
+
+{% for item in report.key_items %}
+### [{{ item.severity | upper }}] {{ item.title }}
+
+**Why relevant:** {{ item.why_relevant }}
+
+**Action:** {{ item.action }}
+
+**Links:** {% for link in item.links %}[{{ link }}]({{ link }}){% if not loop.last %} | {% endif %}{% endfor %}
+
+{% if item.cve %}**CVE:** {{ item.cve }}
+
+{% endif %}
+---
+{% endfor %}
+
+## What Requires Extra Attention Today
+
+{% for item in report.extra_attention %}
+- {{ item }}
+{% endfor %}
+
+---
+
+*Generated {{ now.strftime("%B %-d, %Y") }} from open-source security feeds.*
