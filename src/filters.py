@@ -20,8 +20,8 @@ def apply_filters(items: list[FeedItem], config: AppConfig) -> tuple[list[FeedIt
     ignored_count = 0
 
     for item in items:
-        combined_text = (item.title + " " + item.summary).lower()
-        if any(keyword.lower() in combined_text for keyword in config.filters_ignore):
+        combined_text = item.title + " " + item.summary
+        if any(pattern.search(combined_text) for pattern in config.filters_ignore):
             ignored_count += 1
             log.debug(f"Ignored article: {item.title}")
             continue
@@ -31,8 +31,8 @@ def apply_filters(items: list[FeedItem], config: AppConfig) -> tuple[list[FeedIt
     normal = []
 
     for item in not_ignored:
-        combined_text = (item.title + " " + item.summary).lower()
-        if any(keyword.lower() in combined_text for keyword in config.filters_include):
+        combined_text = item.title + " " + item.summary
+        if any(pattern.search(combined_text) for pattern in config.filters_include):
             included.append(item)
             log.debug(f"Included article: {item.title}")
         else:

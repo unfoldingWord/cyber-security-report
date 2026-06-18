@@ -1,5 +1,6 @@
+import re
 from datetime import datetime
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, ConfigDict, HttpUrl
 
 
 class FeedItem(BaseModel):
@@ -31,6 +32,8 @@ class IntelReport(BaseModel):
 
 
 class AppConfig(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     feeds: list[dict]
     report_title: str
     lookback_hours: int
@@ -45,5 +48,5 @@ class AppConfig(BaseModel):
     zulip_server_url: str | None = None
     zulip_email: str | None = None
     zulip_api_key: str | None = None
-    filters_ignore: list[str] = []
-    filters_include: list[str] = []
+    filters_ignore: list[re.Pattern] = []
+    filters_include: list[re.Pattern] = []

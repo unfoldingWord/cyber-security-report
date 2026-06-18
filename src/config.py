@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 import yaml
@@ -32,8 +33,18 @@ def load_config() -> AppConfig:
             raise ValueError(f"Zulip enabled but missing env vars: {', '.join(missing_vars)}")
 
     filters = config_data.get("filters", {})
-    filters_ignore = [s.lower().strip() for s in filters.get("ignore", [])]
-    filters_include = [s.lower().strip() for s in filters.get("include", [])]
+
+    def _compile_patterns(raw: list, label: str) -> list[re.Pattern]:
+        compiled = []
+        for s in raw:
+            try:
+                compiled.append(re.compile(s.strip(), re.IGNORECASE))
+            except re.error as e:
+                raise ValueError(f"Invalid regex in filters.{label}: {s.strip()!r} — {e}") from e
+        return compiled
+
+    filters_ignore = _compile_patterns(filters.get("ignore", []), "ignore")
+    filters_include = _compile_patterns(filters.get("include", []), "include")
 
     return AppConfig(
         feeds=feeds,
