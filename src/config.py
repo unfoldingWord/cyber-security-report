@@ -44,7 +44,22 @@ def load_config() -> AppConfig:
         return compiled
 
     filters_ignore = _compile_patterns(filters.get("ignore", []), "ignore")
-    filters_include = _compile_patterns(filters.get("include", []), "include")
+
+    environment = config_data.get("environment", {}) or {}
+    environment_description = environment.get("description")
+    if environment_description:
+        environment_description = environment_description.strip()
+    environment_stack = environment.get("stack", []) or []
+
+    environment_interests = []
+    for entry in environment.get("interests", []) or []:
+        environment_interests.append(
+            {
+                "topic": (entry.get("topic") or "").strip(),
+                "include": " ".join((entry.get("include") or "").split()),
+                "exclude": " ".join((entry.get("exclude") or "").split()),
+            }
+        )
 
     return AppConfig(
         feeds=feeds,
@@ -62,5 +77,7 @@ def load_config() -> AppConfig:
         zulip_email=os.getenv("ZULIP_EMAIL"),
         zulip_api_key=os.getenv("ZULIP_API_KEY"),
         filters_ignore=filters_ignore,
-        filters_include=filters_include,
+        environment_description=environment_description,
+        environment_stack=environment_stack,
+        environment_interests=environment_interests,
     )

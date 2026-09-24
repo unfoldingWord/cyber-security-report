@@ -10,6 +10,19 @@ from src.models import FeedItem, AppConfig
 log = logging.getLogger(__name__)
 
 
+# Some feeds (e.g. SecurityWeek) sit behind a WAF that 403s the default
+# python-httpx User-Agent. Present as a normal browser so those feeds serve us.
+DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) "
+        "Gecko/20100101 Firefox/128.0 "
+        "CyberSecurityReport/1.0 "
+        "(+https://github.com/unfoldingWord/cyber-security-report)"
+    ),
+    "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+}
+
+
 class HTMLStripper(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -37,7 +50,9 @@ def strip_html(html_text):
 
 
 async def fetch_all_feeds(config: AppConfig) -> list[FeedItem]:
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+    async with httpx.AsyncClient(
+        timeout=30.0, follow_redirects=True, headers=DEFAULT_HEADERS
+    ) as client:
         tasks = [_fetch_one(client, feed) for feed in config.feeds]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 

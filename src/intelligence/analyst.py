@@ -16,6 +16,38 @@ class AnalystError(Exception):
     pass
 
 
+def _build_environment_note(config: AppConfig) -> str:
+    """Render the environment profile the LLM uses to judge relevance.
+
+    ``environment_stack`` may be a flat list of assets or a mapping of category
+    (e.g. "Internal Systems") to a list of assets.
+    """
+    lines = ["OUR ENVIRONMENT:"]
+    if config.environment_description:
+        lines.append(config.environment_description)
+
+    stack = config.environment_stack
+    if isinstance(stack, dict):
+        for category, assets in stack.items():
+            lines.append(f"{category}:")
+            lines.extend(f"  - {tech}" for tech in assets)
+    elif stack:
+        lines.append("Stack / assets we run:")
+        lines.extend(f"  - {tech}" for tech in stack)
+
+    if config.environment_interests:
+        lines.append("")
+        lines.append("WATCH TOPICS (judged separately from the stack — see INTERESTS rules):")
+        for interest in config.environment_interests:
+            lines.append(f"- {interest['topic']}")
+            if interest.get("include"):
+                lines.append(f"    INCLUDE: {interest['include']}")
+            if interest.get("exclude"):
+                lines.append(f"    EXCLUDE: {interest['exclude']}")
+
+    return "\n".join(lines)
+
+
 async def analyze(items: list[FeedItem], config: AppConfig) -> IntelReport:
     now = datetime.now(timezone.utc)
     lookback = timedelta(hours=config.lookback_hours)
@@ -36,14 +68,14 @@ async def analyze(items: list[FeedItem], config: AppConfig) -> IntelReport:
         reverse=True,
     )
 
-    filtered_items, filter_stats = apply_filters(sorted_items, config)
+    kept_items, filter_stats = apply_filters(sorted_items, config)
 
-    limited = filtered_items[: config.max_items_to_llm]
+    limited = kept_items[: config.max_items_to_llm]
 
     log.info(
         f"Pre-LLM: {len(items)} total → {len(filtered)} in lookback → "
         f"{len(deduped)} after dedup → ignored {filter_stats['ignored_count']} → "
-        f"{len(filtered_items)} after filters → {len(limited)} for LLM"
+        f"{len(kept_items)} after ignore backstop → {len(limited)} for LLM relevance pass"
     )
 
     text_block = "\n\n".join(
@@ -51,20 +83,47 @@ async def analyze(items: list[FeedItem], config: AppConfig) -> IntelReport:
         for item in limited
     )
 
-    inclusion_note = ""
-    if config.filters_include and filter_stats["included_count"] > 0:
-        inclusion_note = "\n\nIMPORTANT: The following articles have been flagged as priority topics and should be emphasized in your analysis:\n"
-        for item in limited[: filter_stats["included_count"]]:
-            inclusion_note += f"  - {item.title}\n"
+    environment_note = _build_environment_note(config)
+
+    interests_rules = ""
+    if config.environment_interests:
+        interests_rules = """
+INTERESTS RULES (a SEPARATE axis from the stack — "worth knowing", not "affects us"):
+- Also surface an item if it is a genuinely notable development matching a WATCH
+  TOPIC's INCLUDE and not its EXCLUDE — even if it touches nothing in our stack.
+- Apply a HIGH bar. Surface at most 1-2 interest items total per briefing, unless
+  one is truly critical. These are nuggets, not a firehose — err toward dropping.
+- An interest item must clear the same EXCLUDE hype filters; ignore product
+  launches, funding, benchmarks, and generic commentary.
+- Prefix the title of an interest-only item with "[Watch] " so it is clearly a
+  heads-up rather than something affecting our systems, and never let interest
+  items crowd out stack-relevant ones.
+"""
 
     prompt = f"""You are a cybersecurity analyst preparing a daily standup briefing.
 
-Analyze these {len(limited)} security news headlines from the last {config.lookback_hours} hours.
+You review a raw feed of security news and surface ONLY what is relevant to our
+environment. Below are {len(limited)} headlines from the last {config.lookback_hours} hours.
 
+{environment_note}
+
+RELEVANCE RULES:
+- Include an item only if it could plausibly affect the systems, software, or
+  supply chain listed in OUR ENVIRONMENT above.
+- Drop news about products, vendors, or platforms we do not run, even if it is
+  high severity — it is not our concern today.
+- When in doubt about whether something touches our stack, lean toward dropping
+  it; false positives about systems we do not run are the main problem to avoid.
+- Judge by meaning, not keywords: a Linux kernel, glibc, sudo, or OpenSSL issue
+  is relevant to our Linux hosts even if it never says "Linux"; a story that
+  merely name-drops "Google" in an unrelated context is not relevant.
+- Let core_situation and extra_attention reflect only the relevant items too.
+  If nothing in the feed is relevant, return empty key_items and say so in
+  core_situation.
+{interests_rules}
 <HEADLINES>
 {text_block}
 </HEADLINES>
-{inclusion_note}
 
 Return ONLY valid JSON matching this exact schema:
 {{
@@ -131,5 +190,5 @@ No prose before or after the JSON."""
         items_analyzed=len(limited),
         sources=sources,
         filtered_ignored_count=filter_stats["ignored_count"],
-        filtered_included_count=filter_stats["included_count"],
+        filtered_included_count=len(key_items),
     )

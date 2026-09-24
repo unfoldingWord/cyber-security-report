@@ -7,16 +7,21 @@ log = logging.getLogger(__name__)
 
 def apply_filters(items: list[FeedItem], config: AppConfig) -> tuple[list[FeedItem], dict]:
     """
-    Apply ignore/include filters to articles.
+    Apply the deterministic ignore backstop.
+
+    Relevance ("is this about a system we run?") is judged by the LLM against the
+    environment profile, not here — keyword whitelisting was too brittle (surface
+    matches on unrelated stories, and misses relevant items phrased differently).
+    This layer only hard-drops known noise so it never reaches the LLM.
 
     Returns:
-      - filtered_items: Items after applying ignore + reordering includes to front
-      - stats: {"ignored_count": int, "included_count": int}
+      - kept_items: Items that matched no ignore pattern, order preserved
+      - stats: {"ignored_count": int}
     """
-    if not config.filters_ignore and not config.filters_include:
-        return items, {"ignored_count": 0, "included_count": 0}
+    if not config.filters_ignore:
+        return items, {"ignored_count": 0}
 
-    not_ignored = []
+    kept = []
     ignored_count = 0
 
     for item in items:
@@ -25,18 +30,6 @@ def apply_filters(items: list[FeedItem], config: AppConfig) -> tuple[list[FeedIt
             ignored_count += 1
             log.debug(f"Ignored article: {item.title}")
             continue
-        not_ignored.append(item)
+        kept.append(item)
 
-    included = []
-    normal = []
-
-    for item in not_ignored:
-        combined_text = item.title + " " + item.summary
-        if any(pattern.search(combined_text) for pattern in config.filters_include):
-            included.append(item)
-            log.debug(f"Included article: {item.title}")
-        else:
-            normal.append(item)
-
-    filtered = included + normal
-    return filtered, {"ignored_count": ignored_count, "included_count": len(included)}
+    return kept, {"ignored_count": ignored_count}

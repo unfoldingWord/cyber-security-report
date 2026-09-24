@@ -31,7 +31,7 @@ Reports appear in `reports/` as dated HTML and/or Markdown files.
 
 ## Key Features
 
-- **Smart filtering**: Ignore noisy articles (e.g., job postings); prioritize critical topics (CVEs, ransomware)
+- **Smart filtering**: Deterministic ignore backstop drops known noise; the LLM judges relevance against your environment profile (see [Filtering & relevance](#filtering--relevance))
 - **Token-efficient**: Single LLM call; deterministic pre-processing (time window, deduplication, truncation)
 - **Flexible output**: File-based reports + optional Zulip integration
 - **Resilient**: Individual feed failures don't crash the pipeline
@@ -41,12 +41,35 @@ Reports appear in `reports/` as dated HTML and/or Markdown files.
 
 Edit `config.yaml` to customize:
 - RSS feeds
-- Filter keywords (ignore/include lists)
-- Report time window
+- `filters.ignore` backstop and the `environment` relevance profile (see below)
+- Report time window and `max_items_to_llm`
 - Output format (HTML, Markdown, or both)
 - Zulip integration (optional)
 
-See [IMPLEMENTATION.md](IMPLEMENTATION.md) for detailed configuration options.
+See [example-config.yaml](example-config.yaml) for a fully-commented template, and [IMPLEMENTATION.md](IMPLEMENTATION.md) for architecture details.
+
+## Filtering & relevance
+
+Two layers with different jobs:
+
+1. **`filters.ignore` — deterministic backstop.** Regex/substring patterns
+   (case-insensitive), matched against each item's title + summary. Any match is
+   **hard-dropped before the LLM sees it** — use it for products and vendors you
+   never run, to save tokens and guarantee they never appear. Invalid regex fails
+   fast at startup.
+2. **`environment` — LLM relevance judgment.** No keyword whitelist. The analyst
+   is given your `environment.description` and `stack` (a flat list, or a mapping
+   of category → assets) and surfaces **only** items relevant to what you run,
+   dropping news about systems you don't — judged by meaning, not string match
+   (e.g. a `glibc` or `sudo` CVE counts as Linux-relevant even if it never says
+   "Linux").
+3. **`environment.interests` (optional) — watch topics.** A separate axis for
+   "worth knowing" rather than "affects us". Each topic has an `include`/`exclude`
+   bar; the LLM applies a high bar, caps output at 1–2 per briefing, and prefixes
+   such items with `[Watch]` so nuggets get through without a flood.
+
+Changing what's in scope is a config edit — no code change. See
+[example-config.yaml](example-config.yaml) for the full shape.
 
 ## Usage
 

@@ -2,6 +2,10 @@
 reports
 development
 .venv
+venv
 .idea
 config.yaml
 __pycache__
+*.egg-info
+build
+dist

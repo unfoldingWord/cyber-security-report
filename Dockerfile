@@ -7,19 +7,14 @@ WORKDIR /build
 # Create a virtual environment in the build directory
 RUN python -m venv venv
 
-# Copy and install dependencies
+# Install the app and its dependencies straight from pyproject.toml, so the
+# image never drifts from the declared dependency list. The project's `src`
+# package is installed too but unused at runtime — the app runs from the copied
+# `src/` in the workdir (see runtime stage).
 COPY pyproject.toml .
+COPY src/ src/
 RUN ./venv/bin/pip install --no-cache-dir --upgrade pip && \
-    ./venv/bin/pip install --no-cache-dir \
-    anyio>=4.13.0 \
-    claude-agent-sdk==0.2.87 \
-    feedparser>=6.0.11 \
-    httpx>=0.28.1 \
-    jinja2>=3.1.4 \
-    pydantic>=2.13.0 \
-    pydantic-settings>=2.14.0 \
-    python-dotenv>=1.2.0 \
-    pyyaml>=6.0.2
+    ./venv/bin/pip install --no-cache-dir .
 
 # Runtime stage
 FROM cgr.dev/chainguard/python:latest

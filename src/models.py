@@ -49,4 +49,8 @@ class AppConfig(BaseModel):
     zulip_email: str | None = None
     zulip_api_key: str | None = None
     filters_ignore: list[re.Pattern] = []
-    filters_include: list[re.Pattern] = []
+    environment_description: str | None = None
+    # Either a flat list of assets, or a mapping of category -> list of assets.
+    environment_stack: list[str] | dict[str, list[str]] = []
+    # Watch topics, each: {"topic": str, "include": str, "exclude": str}.
+    environment_interests: list[dict] = []

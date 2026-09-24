@@ -13,8 +13,13 @@ feeds:
 report:
   title: "Cybersecurity Standup Intelligence Report"
   lookback_hours: 24
-  max_items_to_llm: 30
+  # Cap on items sent to the LLM (most recent first). Set it above the number
+  # that typically survives the lookback + ignore backstop, or relevant items
+  # past the cap get dropped before the LLM can judge them.
+  max_items_to_llm: 40
 
+# Deterministic noise backstop: title+summary regex, case-insensitive.
+# Matching items are hard-dropped before the LLM ever sees them.
 filters:
   ignore:
     - "Microsoft Windows"
@@ -22,10 +27,51 @@ filters:
     - Cisco
     - Fortinet
     - VMWare
-  include:
-    - AWS
-    - Linux
-    - VSCode
+
+# The LLM judges relevance against this profile (no keyword whitelist).
+# It surfaces only items relevant to this stack and drops news about systems
+# we do not run.
+environment:
+  description: >
+    Our production infrastructure and developer tooling. Surface only security
+    news that could affect these systems, the software on them, or their supply
+    chain. Drop news about products we do not run.
+
+  # `stack` accepts either a flat list:
+  #   stack:
+  #     - AWS
+  #     - Linux
+  #     - VSCode
+  # or a mapping of category -> assets (the category labels give the analyst
+  # useful context, e.g. external SaaS vs. internal infra):
+  stack:
+    External Platforms / SaaS:
+      - AWS
+      - Cloudflare
+      - GitHub
+      - Google Workspace
+      - npm
+    Internal Systems:
+      - Docker
+      - Grafana
+      - Linux
+      - Nginx
+
+  # Optional watch topics, judged on a SEPARATE axis from the stack: "worth
+  # knowing" rather than "affects a system we run". The LLM applies a HIGH bar
+  # and surfaces at most 1-2 per briefing, so nuggets get through without a
+  # flood. Interest-only items are prefixed "[Watch]" in the report. Add more
+  # topics (e.g. "ransomware TTPs") using the same include/exclude shape.
+  interests:
+    - topic: AI / LLM security
+      include: >
+        Novel attack techniques (prompt injection, jailbreaks, agent/tool
+        abuse, model or training-data exfiltration), actively-exploited vulns
+        in AI tooling or infrastructure, and supply-chain poisoning of models
+        or datasets.
+      exclude: >
+        Product launches, funding rounds, benchmarks, capability hype, and
+        generic "AI will change security" commentary.
 
 output:
   format: "markdown"

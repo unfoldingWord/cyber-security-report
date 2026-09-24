@@ -22,7 +22,7 @@ cyber-security-report/
 ├── pyproject.toml                   # Dependencies
 ├── src/
 │   ├── config.py                    # load_config() → AppConfig
-│   ├── filters.py                   # apply_filters() - keyword ignore/include filtering
+│   ├── filters.py                   # apply_filters() - deterministic ignore backstop
 │   ├── models.py                    # Pydantic: FeedItem, BriefingItem, IntelReport, AppConfig
 │   ├── fetchers/rss.py              # fetch_all_feeds() - concurrent httpx + feedparser
 │   ├── intelligence/analyst.py      # analyze() - deterministic pre-processing + LLM query
@@ -42,25 +42,39 @@ cyber-security-report/
 ## Key Features
 
 ### 1. Resilient Feed Fetching
-- Concurrent httpx requests to configurable RSS feeds (currently Hacker News, BleepingComputer, The Register)
+- Concurrent httpx requests to configurable RSS feeds
+- A shared browser-like `User-Agent` (plus a `+repo-URL` bot identifier) is sent
+  on every request so WAF-protected feeds (e.g. SecurityWeek) don't 403 the
+  default `python-httpx` agent; see `DEFAULT_HEADERS` in `fetchers/rss.py`
 - Individual feed failures don't crash the pipeline (logged and skipped)
 - HTML stripping from feed summaries before LLM (deterministic, saves tokens)
 
-### 2. Smart Keyword Filtering
-- **Ignore keywords**: Remove noisy articles automatically (e.g., "job opening", "careers")
-- **Include keywords**: Prioritize critical topics (e.g., "ransomware", "CVE")
-  - Included articles moved to front of analysis feed
-  - Explicitly flagged in LLM prompt for emphasis
-  - Transparent reporting: shows count of ignored/prioritized articles
-- Case-insensitive substring matching on title + summary
-- Applied before LLM call (token efficient)
-- Fully optional; empty filters = no filtering applied
+### 2. Hybrid Filtering (deterministic backstop + LLM relevance)
+
+Two layers with different jobs (details in the project `README.md`):
+
+- **`filters.ignore` — deterministic backstop** (`filters.py`): regex/substring
+  patterns (case-insensitive) matched on title + summary. Matches are
+  **hard-dropped before the LLM sees them** — for products/vendors you never run.
+  Compiled once at load; invalid regex fails fast at startup.
+- **`environment` — LLM relevance judgment** (`analyst.py` prompt): no keyword
+  whitelist. The analyst is given `environment.description` + `stack` (flat list
+  or category → assets mapping) and surfaces **only** items relevant to what you
+  run, judged by meaning rather than string match.
+- **`environment.interests` — watch topics** (optional): a separate "worth
+  knowing" axis. Each topic carries an `include`/`exclude` bar; the LLM applies a
+  high bar, caps output at 1–2 items per briefing, and prefixes them `[Watch]`.
+
+> The old keyword *include* whitelist was removed — substring matches caused
+> false positives and missed items phrased differently (a `glibc`/`sudo` CVE that
+> never says "Linux"). Relevance is a semantic judgment, so the LLM does it.
 
 ### 3. Token-Efficient LLM Integration
 - Deterministic pre-processing before any LLM call:
   - Time window filtering (last 24 hours by default)
   - URL-based deduplication
-  - Truncation to max 30 items
+  - Truncation to `max_items_to_llm` most-recent items (size it above the count
+    that survives the lookback + ignore backstop, or relevant items get cut)
 - Single LLM call with compact `SOURCE | TITLE | URL\nSUMMARY` format
 - JSON output validation with Pydantic
 
@@ -99,17 +113,36 @@ feeds:
 report:
   title: "Cybersecurity Standup Intelligence Report"
   lookback_hours: 24          # Deterministic pre-filter window
-  max_items_to_llm: 30        # Token burn cap
+  max_items_to_llm: 40        # Cap on items sent to the LLM (size above post-backstop count)
 
 filters:
-  ignore:                     # Articles matching these keywords are removed entirely
-    - "job opening"
-    - "careers"
-  include:                    # Articles matching these keywords are prioritized and emphasized to LLM
-    - "ransomware"
-    - "critical vulnerability"
-    - "CVE"
-    - "zero-day"
+  ignore:                     # Regex/substring; matches are hard-dropped before the LLM
+    - "Microsoft Windows"
+    - Cisco
+    - "(Fortinet|VMWare)"
+
+environment:                  # LLM judges relevance against this profile (no keyword whitelist)
+  description: >
+    Our production infrastructure and developer tooling. Surface only security
+    news that could affect these systems, the software on them, or their supply
+    chain. Drop news about products we do not run.
+  stack:                      # Flat list, or a mapping of category -> assets
+    External Platforms / SaaS:
+      - AWS
+      - Cloudflare
+      - GitHub
+      - npm
+    Internal Systems:
+      - Docker
+      - Linux
+      - Nginx
+  interests:                  # Optional "worth knowing" watch topics, capped at 1-2/briefing
+    - topic: AI / LLM security
+      include: >
+        Novel attack techniques, actively-exploited vulns in AI tooling, and
+        supply-chain poisoning of models or datasets.
+      exclude: >
+        Product launches, funding, benchmarks, and generic AI commentary.
 
 output:
   format: "both"              # "html", "markdown", or "both"
@@ -144,7 +177,7 @@ The report is organized into three main sections:
 **Key Items**
 > Structured briefing items, each with:
 > - **Severity**: critical, high, medium, or threat
-> - **Title**: Short descriptive heading
+> - **Title**: Short descriptive heading (interest/watch-topic items are prefixed `[Watch]`)
 > - **Why Relevant**: One-sentence justification
 > - **Action**: Concrete recommended response
 > - **Links**: Associated URLs (optional)
@@ -221,10 +254,12 @@ Both read `pyproject.toml` and install all required packages.
 
 All components tested end-to-end:
 
-✓ Feed fetching: 35 items from 2 working feeds  
-✓ Keyword filtering: Ignore/include lists work correctly, stats tracked
-✓ Pre-processing: Time window filtering (24h lookback), deduplication, truncation  
-✓ LLM analysis: Single query returns valid JSON, included articles emphasized  
+✓ Feed fetching: all configured feeds fetch (browser UA clears WAF 403s)
+✓ Ignore backstop: regex/substring matches hard-dropped before the LLM, count tracked
+✓ LLM relevance: only stack-relevant items surfaced; each cites the asset it affects
+✓ Interests: AI watch-topic nuggets surface `[Watch]`-tagged and capped, hype excluded
+✓ Pre-processing: Time window filtering (24h lookback), deduplication, truncation
+✓ LLM analysis: Single query returns valid JSON  
 ✓ HTML rendering: Proper styling, brand colors, filter stats in metadata  
 ✓ Markdown rendering: Clean format, Zulip-compatible, filter stats displayed  
 ✓ File output: Date-stamped files created in reports/  
@@ -238,10 +273,10 @@ All components tested end-to-end:
 3. Call from `main.py` in the output phase
 
 ### Customize filtering logic:
-1. Edit `src/filters.py` `apply_filters()` function
-2. Support regex patterns: Enhance matching from substring to regex if needed
-3. Add weighted prioritization: Return include/ignore scores instead of binary filtering
-4. Add per-feed filters: Extend config to allow feed-specific ignore/include lists
+1. Ignore backstop: edit `filters.ignore` in `config.yaml` (regex supported) — no code change
+2. Relevance / interests: edit `environment` in `config.yaml`; to change how the profile
+   is rendered into the prompt, edit `_build_environment_note()` in `analyst.py`
+3. Add per-feed filters: extend the config schema and `apply_filters()` for feed-specific rules
 
 ### Modify the LLM prompt:
 1. Edit the prompt template in `src/intelligence/analyst.py`
