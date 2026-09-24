@@ -40,8 +40,8 @@ class AppConfig(BaseModel):
     max_items_to_llm: int
     output_format: str
     file_enabled: bool
-    file_html_path: str
-    file_markdown_path: str
+    file_html_path: str | None = None
+    file_markdown_path: str | None = None
     zulip_enabled: bool
     zulip_stream: str
     zulip_topic: str

@@ -20,6 +20,29 @@ def load_config() -> AppConfig:
     output_file = output["file"]
     output_zulip = output["zulip"]
 
+    output_format = output["format"]
+    valid_formats = ("markdown", "html", "both")
+    if output_format not in valid_formats:
+        raise ValueError(
+            f"output.format must be one of {valid_formats}, got {output_format!r}"
+        )
+
+    file_enabled = output_file["enabled"]
+    file_html_path = output_file.get("html_path")
+    file_markdown_path = output_file.get("markdown_path")
+
+    # A path is only required when file output is on AND the format that writes
+    # it is selected. This lets html_path stay unset in markdown mode.
+    if file_enabled:
+        if output_format in ("html", "both") and not file_html_path:
+            raise ValueError(
+                f"output.format is {output_format!r} but output.file.html_path is not set"
+            )
+        if output_format in ("markdown", "both") and not file_markdown_path:
+            raise ValueError(
+                f"output.format is {output_format!r} but output.file.markdown_path is not set"
+            )
+
     zulip_enabled = output_zulip["enabled"]
     if zulip_enabled:
         missing_vars = []
@@ -66,10 +89,10 @@ def load_config() -> AppConfig:
         report_title=report["title"],
         lookback_hours=report["lookback_hours"],
         max_items_to_llm=report["max_items_to_llm"],
-        output_format=output["format"],
-        file_enabled=output_file["enabled"],
-        file_html_path=output_file["html_path"],
-        file_markdown_path=output_file["markdown_path"],
+        output_format=output_format,
+        file_enabled=file_enabled,
+        file_html_path=file_html_path,
+        file_markdown_path=file_markdown_path,
         zulip_enabled=zulip_enabled,
         zulip_stream=output_zulip["stream"],
         zulip_topic=output_zulip["topic"],
