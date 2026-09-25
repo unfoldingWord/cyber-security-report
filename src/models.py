@@ -14,6 +14,7 @@ class FeedItem(BaseModel):
 class BriefingItem(BaseModel):
     severity: str
     title: str
+    affects: str | None = None
     why_relevant: str
     action: str
     links: list[str] = []

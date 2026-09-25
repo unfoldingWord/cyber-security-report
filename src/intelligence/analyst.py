@@ -132,7 +132,8 @@ Return ONLY valid JSON matching this exact schema:
     {{
       "severity": "critical|high|medium|threat",
       "title": "Short descriptive title",
-      "why_relevant": "One sentence on relevance",
+      "affects": "Which of our assets/systems this touches, e.g. 'WordPress' (comma-separated if several; for a [Watch] item, the watch topic)",
+      "why_relevant": "One sentence on WHY it matters. Do NOT restate our stack here (no 'We run WordPress; ...') — the affected asset already goes in affects.",
       "action": "Concrete action to take",
       "links": ["https://..."],
       "cve": "CVE-YYYY-NNNNN or null"
@@ -174,6 +175,7 @@ No prose before or after the JSON."""
         BriefingItem(
             severity=item_data["severity"],
             title=item_data["title"],
+            affects=item_data.get("affects"),
             why_relevant=item_data["why_relevant"],
             action=item_data["action"],
             links=item_data.get("links", []),

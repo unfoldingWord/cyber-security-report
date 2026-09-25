@@ -222,6 +222,12 @@
         <span class="item-badge badge-{{ item.severity }}">{{ item.severity }}</span>
         {{ item.title }}
       </div>
+{% if item.affects %}
+      <div class="item-row">
+        <span class="item-label">Affects</span>
+        <span class="item-text">{{ item.affects }}</span>
+      </div>
+{% endif %}
       <div class="item-row">
         <span class="item-label">Why relevant</span>
         <span class="item-text">{{ item.why_relevant }}</span>

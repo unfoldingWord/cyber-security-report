@@ -17,7 +17,9 @@
 {% for item in report.key_items %}
 ### [{{ item.severity | upper }}] {{ item.title }}
 
-**Why relevant:** {{ item.why_relevant }}
+{% if item.affects %}**Affects:** {{ item.affects }}
+
+{% endif %}**Why relevant:** {{ item.why_relevant }}
 
 **Action:** {{ item.action }}
 
